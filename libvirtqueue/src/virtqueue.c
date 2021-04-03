@@ -46,8 +46,7 @@ void virtqueue_init_device(virtqueue_device_t *vq, unsigned queue_len, vq_vring_
 
 void virtqueue_init_desc_table(vq_vring_desc_t *table, unsigned queue_len)
 {
-    unsigned i;
-    for (i = 0; i < queue_len; i++) {
+    for (unsigned i = 0; i < queue_len; i++) {
         table[i].addr = 0;
         table[i].len = 0;
         table[i].flags = 0;
