@@ -21,8 +21,8 @@ typedef enum vq_flags {
 
 /* Ring of available buffers */
 typedef struct vq_vring_avail {
-    uint16_t flags;             /* Interrupt suppression flag */
-    uint16_t idx;               /* Index of the next free entry in the ring */
+    uint16_t flags;    /* Interrupt suppression flag */
+    uint16_t idx;      /* Index of the next free entry in the ring */
     uint16_t ring[];   /* The ring of descriptor table entries */
 } vq_vring_avail_t;
 
@@ -34,8 +34,8 @@ typedef struct vq_vring_used_elem {
 
 /* Ring of used buffers */
 typedef struct vq_vring_used {
-    uint16_t flags;                             /* Interrupt suppression flag */
-    uint16_t idx;                               /* Index of the next free entry in the ring */
+    uint16_t flags;                    /* Interrupt suppression flag */
+    uint16_t idx;                      /* Index of the next free entry in the ring */
     struct vq_vring_used_elem ring[];  /* The ring of descriptor table entries */
 } vq_vring_used_t;
 
