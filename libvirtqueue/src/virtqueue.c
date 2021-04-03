@@ -70,15 +70,15 @@ void virtqueue_init_used_ring(vq_vring_used_t *ring)
 static unsigned vq_add_desc(virtqueue_driver_t *vq, void *buf, unsigned len,
                             vq_flags_t flag, int prev)
 {
-    unsigned new;
+    unsigned head;
     vq_vring_desc_t *desc;
 
-    new = vq->free_desc_head;
-    if (new == vq->queue_len) {
-        return new;
+    head = vq->free_desc_head;
+    if (head == vq->queue_len) {
+        return head;
     }
-    vq->free_desc_head = vq->desc_table[new].next;
-    desc = vq->desc_table + new;
+    vq->free_desc_head = vq->desc_table[head].next;
+    desc = vq->desc_table + head;
 
     desc->addr = (uintptr_t)buf;
     desc->len = len;
@@ -87,9 +87,9 @@ static unsigned vq_add_desc(virtqueue_driver_t *vq, void *buf, unsigned len,
 
     if (prev < vq->queue_len) {
         desc = vq->desc_table + prev;
-        desc->next = new;
+        desc->next = head;
     }
-    return new;
+    return head;
 }
 
 static unsigned vq_pop_desc(virtqueue_driver_t *vq, unsigned idx,
