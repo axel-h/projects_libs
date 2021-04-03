@@ -80,10 +80,7 @@ static unsigned vq_add_desc(virtqueue_driver_t *vq, void *buf, unsigned len,
     vq->free_desc_head = vq->desc_table[new].next;
     desc = vq->desc_table + new;
 
-    // casting pointers to integers directly is not allowed, must cast the
-    // pointer to a uintptr_t first
     desc->addr = (uintptr_t)buf;
-
     desc->len = len;
     desc->flags = flag;
     desc->next = vq->queue_len;
