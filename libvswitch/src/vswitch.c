@@ -92,9 +92,7 @@ int vswitch_get_destnode_index_by_macaddr(vswitch_t *lib,
 vswitch_node_t *vswitch_get_destnode_by_index(vswitch_t *lib, size_t index)
 {
     if (mac802_addr_eq((void *)&lib->nodes[index].addr, &null_macaddr)) {
-        /* If the index requested is has a NULL mac addr in it, return
-         * error.
-         */
+        /* If the index requested has a NULL mac addr in it, return error. */
         return NULL;
     }
 

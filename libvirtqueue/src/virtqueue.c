@@ -80,10 +80,7 @@ static unsigned vq_add_desc(virtqueue_driver_t *vq, void *buf, unsigned len,
     vq->free_desc_head = vq->desc_table[new].next;
     desc = vq->desc_table + new;
 
-    // casting pointers to integers directly is not allowed, must cast the
-    // pointer to a uintptr_t first
     desc->addr = (uintptr_t)buf;
-
     desc->len = len;
     desc->flags = flag;
     desc->next = vq->queue_len;
@@ -148,6 +145,18 @@ int virtqueue_get_used_buf(virtqueue_driver_t *vq, virtqueue_ring_object_t *obj,
 
 int virtqueue_add_used_buf(virtqueue_device_t *vq, virtqueue_ring_object_t *robj, uint32_t len)
 {
+    /* The len passed here is the length of the data. Obviously, the length
+     * can't be greater than the the space available in all chained buffers of
+     * the ring object. We have a sanity check here for debug builds, but it's
+     * not really our concern here. The driver must check this when it takes
+     * data out of the queue and then decide how to handle this.
+     * There could be more buffers chained in the ring object then actually
+     * necessary to hold data. Especially, the caller can pass 0 here if there
+     * no data is in the buffers at all, because it is returning something to
+     * the queue to be recycled.
+     */
+    assert((0 == len) || (len == virtqueue_scattered_available_size(vq, robj)));
+
     unsigned cur = vq->used_ring->idx;
 
     vq->used_ring->ring[cur].id = robj->first;
