@@ -126,7 +126,7 @@ int virtqueue_add_available_buf(virtqueue_driver_t *vq, virtqueue_ring_object_t 
     /* If this is the first buffer in the descriptor chain */
     if (obj->first >= vq->queue_len) {
         obj->first = idx;
-        vq->avail_ring->ring[vq->avail_ring->idx] = idx;
+        vq->avail_ring->ring[vq->avail_ring->idx].id = idx;
         vq->avail_ring->idx = (vq->avail_ring->idx + 1) & (vq->queue_len - 1);
     }
     return 1;
@@ -163,7 +163,7 @@ int virtqueue_get_available_buf(virtqueue_device_t *vq, virtqueue_ring_object_t 
     if (next == vq->avail_ring->idx) {
         return 0;
     }
-    robj->first = vq->avail_ring->ring[next];
+    robj->first = vq->avail_ring->ring[next].id;
     robj->cur = robj->first;
     vq->a_ring_last_seen = next;
     return 1;
