@@ -47,10 +47,10 @@ void virtqueue_init_device(virtqueue_device_t *vq, unsigned queue_len, vq_vring_
 void virtqueue_init_desc_table(vq_vring_desc_t *table, unsigned queue_len)
 {
     for (unsigned i = 0; i < queue_len; i++) {
-        table[i].addr = 0;
-        table[i].len = 0;
-        table[i].flags = 0;
-        table[i].next = i + 1;
+        table[i] = (vq_vring_desc_t) {
+            /* All fields not mentioned are set to zero. */
+            .next = i + 1
+        };
     }
 }
 
@@ -69,15 +69,13 @@ void virtqueue_init_used_ring(vq_vring_used_t *ring)
 static unsigned vq_add_desc(virtqueue_driver_t *vq, void *buf, unsigned len,
                             vq_flags_t flag, int prev)
 {
-    unsigned head;
-    vq_vring_desc_t *desc;
-
-    head = vq->free_desc_head;
+    unsigned head = vq->free_desc_head;
     if (head == vq->queue_len) {
         return head;
     }
-    vq->free_desc_head = vq->desc_table[head].next;
-    desc = vq->desc_table + head;
+
+    vq_vring_desc_t *desc = &vq->desc_table[head];
+    vq->free_desc_head = desc->next;
 
     desc->addr = (uintptr_t)buf;
     desc->len = len;
@@ -88,21 +86,23 @@ static unsigned vq_add_desc(virtqueue_driver_t *vq, void *buf, unsigned len,
         desc = vq->desc_table + prev;
         desc->next = head;
     }
+
     return head;
 }
 
 static unsigned vq_pop_desc(virtqueue_driver_t *vq, unsigned idx,
                             void **buf, unsigned *len, vq_flags_t *flag)
 {
-    unsigned next = vq->desc_table[idx].next;
+    vq_vring_desc_t *desc = &vq->desc_table[idx];
 
     // casting integers to pointers directly is not allowed, must cast the
     // integer to a uintptr_t first
-    *buf = (void *)(uintptr_t)(vq->desc_table[idx].addr);
+    *buf = (void *)(uintptr_t)(desc->addr);
+    *len = desc->len;
+    *flag = desc->flags;
 
-    *len = vq->desc_table[idx].len;
-    *flag = vq->desc_table[idx].flags;
-    vq->desc_table[idx].next = vq->free_desc_head;
+    unsigned next = desc->next;
+    desc->next = vq->free_desc_head;
     vq->free_desc_head = idx;
 
     return next;
@@ -111,7 +111,7 @@ static unsigned vq_pop_desc(virtqueue_driver_t *vq, unsigned idx,
 int virtqueue_add_available_buf(virtqueue_driver_t *vq, virtqueue_ring_object_t *obj,
                                 void *buf, unsigned len, vq_flags_t flag)
 {
-    unsigned idx;
+    unsigned idx = vq_add_desc(vq, buf, len, flag, obj->cur);
 
     /* If descriptor table full */
     if ((idx = vq_add_desc(vq, buf, len, flag, obj->cur)) == vq->queue_len) {
@@ -122,23 +122,26 @@ int virtqueue_add_available_buf(virtqueue_driver_t *vq, virtqueue_ring_object_t 
     /* If this is the first buffer in the descriptor chain */
     if (obj->first >= vq->queue_len) {
         obj->first = idx;
-        vq->avail_ring->ring[vq->avail_ring->idx].id = idx;
-        vq->avail_ring->idx = (vq->avail_ring->idx + 1) & (vq->queue_len - 1);
+        struct vq_vring_avail *ring = vq->avail_ring;
+        struct vq_vring_avail_elem *e = &ring->ring[ring->idx];
+        e->id = idx;
+        ring->idx = (ring->idx + 1) & (vq->queue_len - 1);
     }
     return 1;
 }
 
 int virtqueue_get_used_buf(virtqueue_driver_t *vq, virtqueue_ring_object_t *obj, uint32_t *len)
 {
+    struct vq_vring_used *ring = vq->used_ring;
     unsigned next = (vq->u_ring_last_seen + 1) & (vq->queue_len - 1);
-
-    if (next == vq->used_ring->idx) {
+    if (next == ring->idx) {
         return 0;
     }
-    obj->first = vq->used_ring->ring[next].id;
-    *len = vq->used_ring->ring[next].len;
-    obj->cur = obj->first;
     vq->u_ring_last_seen = next;
+    struct vq_vring_used_elem *e = &ring->ring[next];
+    obj->first = e->id;
+    obj->cur = e->id;
+    *len = e->len;
     return 1;
 }
 
@@ -154,24 +157,23 @@ int virtqueue_add_used_buf(virtqueue_device_t *vq, virtqueue_ring_object_t *robj
      * no data is in the buffers at all, because it is returning something to
      * the queue to be recycled.
      */
-    assert((0 == len) || (len == virtqueue_scattered_available_size(vq, robj)));
-
-    unsigned cur = vq->used_ring->idx;
-
-    vq->used_ring->ring[cur].id = robj->first;
-    vq->used_ring->ring[cur].len = len;
-    vq->used_ring->idx = (cur + 1) & (vq->queue_len - 1);
+    struct vq_vring_used *ring = vq->used_ring;
+    struct vq_vring_used_elem *e = &ring->ring[ring->idx];
+    e->id = robj->first;
+    e->len = len;
+    ring->idx = (ring->idx + 1) & (vq->queue_len - 1);
     return 1;
 }
 
 int virtqueue_get_available_buf(virtqueue_device_t *vq, virtqueue_ring_object_t *robj)
 {
+    struct vq_vring_avail *ring = vq->avail_ring;
     unsigned next = (vq->a_ring_last_seen + 1) & (vq->queue_len - 1);
-
-    if (next == vq->avail_ring->idx) {
+    if (next == ring->idx) {
         return 0;
     }
-    robj->first = vq->avail_ring->ring[next].id;
+    struct vq_vring_avail_elem *e = &ring->ring[next];
+    robj->first = e->id;
     robj->cur = robj->first;
     vq->a_ring_last_seen = next;
     return 1;
@@ -186,11 +188,12 @@ void virtqueue_init_ring_object(virtqueue_ring_object_t *obj)
 uint32_t virtqueue_scattered_available_size(virtqueue_device_t *vq, virtqueue_ring_object_t *robj)
 {
     uint32_t ret = 0;
-    unsigned cur = robj->first;
+    unsigned int cur = robj->first;
 
     while (cur < vq->queue_len) {
-        ret += vq->desc_table[cur].len;
-        cur = vq->desc_table[cur].next;
+        vq_vring_desc_t *desc = &vq->desc_table[cur];
+        ret += desc->len;
+        cur = desc->next;
     }
     return ret;
 }
@@ -204,13 +207,16 @@ int virtqueue_gather_available(virtqueue_device_t *vq, virtqueue_ring_object_t *
         return 0;
     }
 
+    vq_vring_desc_t *desc = &vq->desc_table[idx];
+
     // casting integers to pointers directly is not allowed, must cast the
     // integer to a uintptr_t first
-    *buf = (void *)(uintptr_t)(vq->desc_table[idx].addr);
+    *buf = (void *)(uintptr_t)(desc->addr);
+    *len = desc->len;
+    *flag = desc->flags;
 
-    *len = vq->desc_table[idx].len;
-    *flag = vq->desc_table[idx].flags;
-    robj->cur = vq->desc_table[idx].next;
+    robj->cur = desc->next;
+
     return 1;
 }
 
