@@ -7,7 +7,7 @@
 #include <utils/util.h>
 #include <virtqueue.h>
 
-void virtqueue_init_driver(virtqueue_driver_t *vq, unsigned queue_len, vq_vring_avail_t *avail_ring,
+void virtqueue_init_driver(virtqueue_driver_t *vq, size_t queue_len, vq_vring_avail_t *avail_ring,
                            vq_vring_used_t *used_ring, vq_vring_desc_t *desc, void (*notify)(void),
                            void *cookie)
 {
@@ -28,7 +28,7 @@ void virtqueue_init_driver(virtqueue_driver_t *vq, unsigned queue_len, vq_vring_
 
 }
 
-void virtqueue_init_device(virtqueue_device_t *vq, unsigned queue_len, vq_vring_avail_t *avail_ring,
+void virtqueue_init_device(virtqueue_device_t *vq, size_t queue_len, vq_vring_avail_t *avail_ring,
                            vq_vring_used_t *used_ring, vq_vring_desc_t *desc, void (*notify)(void),
                            void *cookie)
 {
@@ -44,7 +44,7 @@ void virtqueue_init_device(virtqueue_device_t *vq, unsigned queue_len, vq_vring_
     vq->cookie = cookie;
 }
 
-void virtqueue_init_desc_table(vq_vring_desc_t *table, unsigned queue_len)
+void virtqueue_init_desc_table(vq_vring_desc_t *table, size_t queue_len)
 {
     for (unsigned i = 0; i < queue_len; i++) {
         table[i] = (vq_vring_desc_t) {
@@ -66,10 +66,10 @@ void virtqueue_init_used_ring(vq_vring_used_t *ring)
     ring->idx = 0;
 }
 
-static unsigned vq_add_desc(virtqueue_driver_t *vq, void *buf, unsigned len,
-                            vq_flags_t flag, int prev)
+static size_t vq_add_desc(virtqueue_driver_t *vq, void *buf, size_t len,
+                          vq_flags_t flag, int prev)
 {
-    unsigned head = vq->free_desc_head;
+    size_t head = vq->free_desc_head;
     if (head == vq->queue_len) {
         return head;
     }
@@ -90,8 +90,8 @@ static unsigned vq_add_desc(virtqueue_driver_t *vq, void *buf, unsigned len,
     return head;
 }
 
-static unsigned vq_pop_desc(virtqueue_driver_t *vq, unsigned idx,
-                            void **buf, unsigned *len, vq_flags_t *flag)
+static size_t vq_pop_desc(virtqueue_driver_t *vq, size_t idx,
+                          void **buf, size_t *len, vq_flags_t *flag)
 {
     vq_vring_desc_t *desc = &vq->desc_table[idx];
 
@@ -101,7 +101,7 @@ static unsigned vq_pop_desc(virtqueue_driver_t *vq, unsigned idx,
     *len = desc->len;
     *flag = desc->flags;
 
-    unsigned next = desc->next;
+    size_t next = desc->next;
     desc->next = vq->free_desc_head;
     vq->free_desc_head = idx;
 
@@ -109,9 +109,9 @@ static unsigned vq_pop_desc(virtqueue_driver_t *vq, unsigned idx,
 }
 
 int virtqueue_add_available_buf(virtqueue_driver_t *vq, virtqueue_ring_object_t *obj,
-                                void *buf, unsigned len, vq_flags_t flag)
+                                void *buf, size_t len, vq_flags_t flag)
 {
-    unsigned idx = vq_add_desc(vq, buf, len, flag, obj->cur);
+    size_t idx = vq_add_desc(vq, buf, len, flag, obj->cur);
 
     /* If descriptor table full */
     if ((idx = vq_add_desc(vq, buf, len, flag, obj->cur)) == vq->queue_len) {
@@ -130,10 +130,10 @@ int virtqueue_add_available_buf(virtqueue_driver_t *vq, virtqueue_ring_object_t 
     return 1;
 }
 
-int virtqueue_get_used_buf(virtqueue_driver_t *vq, virtqueue_ring_object_t *obj, uint32_t *len)
+int virtqueue_get_used_buf(virtqueue_driver_t *vq, virtqueue_ring_object_t *obj, size_t *len)
 {
     struct vq_vring_used *ring = vq->used_ring;
-    unsigned next = (vq->u_ring_last_seen + 1) & (vq->queue_len - 1);
+    size_t next = (vq->u_ring_last_seen + 1) & (vq->queue_len - 1);
     if (next == ring->idx) {
         return 0;
     }
@@ -145,7 +145,7 @@ int virtqueue_get_used_buf(virtqueue_driver_t *vq, virtqueue_ring_object_t *obj,
     return 1;
 }
 
-int virtqueue_add_used_buf(virtqueue_device_t *vq, virtqueue_ring_object_t *robj, uint32_t len)
+int virtqueue_add_used_buf(virtqueue_device_t *vq, virtqueue_ring_object_t *robj, size_t len)
 {
     /* The len passed here is the length of the data. Obviously, the length
      * can't be greater than the the space available in all chained buffers of
@@ -168,7 +168,7 @@ int virtqueue_add_used_buf(virtqueue_device_t *vq, virtqueue_ring_object_t *robj
 int virtqueue_get_available_buf(virtqueue_device_t *vq, virtqueue_ring_object_t *robj)
 {
     struct vq_vring_avail *ring = vq->avail_ring;
-    unsigned next = (vq->a_ring_last_seen + 1) & (vq->queue_len - 1);
+    size_t next = (vq->a_ring_last_seen + 1) & (vq->queue_len - 1);
     if (next == ring->idx) {
         return 0;
     }
@@ -181,14 +181,14 @@ int virtqueue_get_available_buf(virtqueue_device_t *vq, virtqueue_ring_object_t 
 
 void virtqueue_init_ring_object(virtqueue_ring_object_t *obj)
 {
-    obj->cur = (uint32_t) -1;
-    obj->first = (uint32_t) -1;
+    obj->cur = (size_t)(-1);
+    obj->first = (size_t)(-1);
 }
 
-uint32_t virtqueue_scattered_available_size(virtqueue_device_t *vq, virtqueue_ring_object_t *robj)
+size_t virtqueue_scattered_available_size(virtqueue_device_t *vq, virtqueue_ring_object_t *robj)
 {
-    uint32_t ret = 0;
-    unsigned int cur = robj->first;
+    size_t ret = 0;
+    size_t cur = robj->first;
 
     while (cur < vq->queue_len) {
         vq_vring_desc_t *desc = &vq->desc_table[cur];
@@ -199,9 +199,9 @@ uint32_t virtqueue_scattered_available_size(virtqueue_device_t *vq, virtqueue_ri
 }
 
 int virtqueue_gather_available(virtqueue_device_t *vq, virtqueue_ring_object_t *robj,
-                               void **buf, unsigned *len, vq_flags_t *flag)
+                               void **buf, size_t *len, vq_flags_t *flag)
 {
-    unsigned idx = robj->cur;
+    size_t idx = robj->cur;
 
     if (idx >= vq->queue_len) {
         return 0;
@@ -221,7 +221,7 @@ int virtqueue_gather_available(virtqueue_device_t *vq, virtqueue_ring_object_t *
 }
 
 int virtqueue_gather_used(virtqueue_driver_t *vq, virtqueue_ring_object_t *robj,
-                          void **buf, unsigned *len, vq_flags_t *flag)
+                          void **buf, size_t *len, vq_flags_t *flag)
 {
     if (robj->cur >= vq->queue_len) {
         return 0;

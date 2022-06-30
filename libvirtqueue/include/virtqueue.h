@@ -7,6 +7,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stddef.h>
 
 
 #define VQ_DEV_POLL(vq) ((((vq)->a_ring_last_seen + 1) & ((vq)->queue_len - 1)) != (vq)->avail_ring->idx)
@@ -33,8 +34,8 @@ typedef struct vq_vring_avail {
 
 /* Element of a used ring buffer */
 typedef struct vq_vring_used_elem {
-    uint32_t id;        /* Index in descriptor table */
-    uint32_t len;       /* Length of data that was written by the device */
+    size_t id;        /* Index in descriptor table */
+    size_t len;       /* Length of data that was written by the device */
 } vq_vring_used_elem_t;
 
 /* Ring of used buffers */
@@ -47,15 +48,15 @@ typedef struct vq_vring_used {
 /* Entry in the descriptor table */
 typedef struct vq_vring_desc {
     uint64_t addr;      /* Address of the buffer in the shared memory */
-    uint32_t len;       /* Length of the buffer */
+    size_t len;         /* Length of the buffer */
     uint16_t flags;     /* Flag of the buffer */
     uint16_t next;      /* Index of the next descriptor table entry in the scatter list */
 } vq_vring_desc_t;
 
 /* Handle for iterating through a scatter list */
 typedef struct virtqueue_ring_object {
-    uint32_t cur;       /* The current index in desc table */
-    uint32_t first;     /* The head of the scatter list in desc table */
+    size_t cur;       /* The current index in desc table */
+    size_t first;     /* The head of the scatter list in desc table */
 } virtqueue_ring_object_t;
 
 /* A device-side virtqueue */
@@ -63,8 +64,8 @@ typedef struct virtqueue_device {
     void (*notify)(void);       /* Notify function to wake-up driver side */
     void *cookie;               /* User-defined cookie */
 
-    unsigned queue_len;         /* The number of entries in rings and descriptor table */
-    unsigned a_ring_last_seen;  /* Index of the last seen element in the available ring */
+    size_t queue_len;           /* The number of entries in rings and descriptor table */
+    size_t a_ring_last_seen;    /* Index of the last seen element in the available ring */
 
     struct vq_vring_avail *avail_ring; /* The available ring */
     struct vq_vring_used *used_ring;   /* The used ring */
@@ -76,9 +77,9 @@ typedef struct virtqueue_driver {
     void (*notify)(void);       /* Notify function to wake-up device side */
     void *cookie;               /* User-defined cookie */
 
-    unsigned queue_len;         /* The number of entries in rings and descriptor table */
-    unsigned free_desc_head;    /* The head of the free list in the descriptor table */
-    unsigned u_ring_last_seen;  /* Index of the last seen element in the used ring */
+    size_t queue_len;           /* The number of entries in rings and descriptor table */
+    size_t free_desc_head;      /* The head of the free list in the descriptor table */
+    size_t u_ring_last_seen;    /* Index of the last seen element in the used ring */
 
     struct vq_vring_avail *avail_ring; /* The available ring */
     struct vq_vring_used *used_ring;   /* The used ring */
@@ -94,7 +95,7 @@ typedef struct virtqueue_driver {
  * @param notify the notify function to wake up device side
  * @param cookie user's cookie
  */
-void virtqueue_init_driver(virtqueue_driver_t *vq, unsigned queue_len, vq_vring_avail_t *avail_ring,
+void virtqueue_init_driver(virtqueue_driver_t *vq, size_t queue_len, vq_vring_avail_t *avail_ring,
                            vq_vring_used_t *used_ring, vq_vring_desc_t *desc, void (*notify)(void),
                            void *cookie);
 
@@ -107,12 +108,12 @@ void virtqueue_init_driver(virtqueue_driver_t *vq, unsigned queue_len, vq_vring_
  * @param notify the notify function to wake up driver side
  * @param cookie user's cookie
  */
-void virtqueue_init_device(virtqueue_device_t *vq, unsigned queue_len, vq_vring_avail_t *avail_ring,
+void virtqueue_init_device(virtqueue_device_t *vq, size_t queue_len, vq_vring_avail_t *avail_ring,
                            vq_vring_used_t *used_ring, vq_vring_desc_t *desc, void (*notify)(void),
                            void *cookie);
 
 /* Initialise the descriptor table (create the free list) */
-void virtqueue_init_desc_table(vq_vring_desc_t *table, unsigned queue_len);
+void virtqueue_init_desc_table(vq_vring_desc_t *table, size_t queue_len);
 
 /* Initialise the available ring */
 void virtqueue_init_avail_ring(vq_vring_avail_t *ring);
@@ -133,7 +134,7 @@ void virtqueue_init_used_ring(vq_vring_used_t *ring);
  * @return 1 on success, 0 on failure (ring full)
  */
 int virtqueue_add_available_buf(virtqueue_driver_t *vq, virtqueue_ring_object_t *obj,
-                                void *buf, unsigned len, vq_flags_t flag);
+                                void *buf, size_t len, vq_flags_t flag);
 
 /* Get buffer from used ring. Dequeue a buffer from the used ring and get an iterator to the scatterlist
  * @param vq the driver side virtqueue
@@ -141,7 +142,7 @@ int virtqueue_add_available_buf(virtqueue_driver_t *vq, virtqueue_ring_object_t 
  * @param len a pointer to the length of the buffer that was actually used by the device
  * @return 1 on success, 0 on failure (ring empty)
  */
-int virtqueue_get_used_buf(virtqueue_driver_t *vq, virtqueue_ring_object_t *robj, uint32_t *len);
+int virtqueue_get_used_buf(virtqueue_driver_t *vq, virtqueue_ring_object_t *robj, size_t *len);
 
 /** Device side **/
 
@@ -152,7 +153,7 @@ int virtqueue_get_used_buf(virtqueue_driver_t *vq, virtqueue_ring_object_t *robj
  * @param len the length of the buffer that the device actually used
  * @return 1 on success, 0 on failure (ring full)
  */
-int virtqueue_add_used_buf(virtqueue_device_t *vq, virtqueue_ring_object_t *robj, uint32_t len);
+int virtqueue_add_used_buf(virtqueue_device_t *vq, virtqueue_ring_object_t *robj, size_t len);
 
 /* Get buffer from available ring. Returns an iterator to the next available buffer list
  * @param vq the device side virtqueue
@@ -171,7 +172,7 @@ void virtqueue_init_ring_object(virtqueue_ring_object_t *obj);
  * @param robj a pointer to the ring object/handle
  * @return the length of the scatterlist
  */
-uint32_t virtqueue_scattered_available_size(virtqueue_device_t *vq, virtqueue_ring_object_t *robj);
+size_t virtqueue_scattered_available_size(virtqueue_device_t *vq, virtqueue_ring_object_t *robj);
 
 /* Iteration function through an available buffer scatterlist. Returns the next buffer in the list.
  * @param vq the device side virtqueue
@@ -182,7 +183,7 @@ uint32_t virtqueue_scattered_available_size(virtqueue_device_t *vq, virtqueue_ri
  * @return 1 on success, 0 on failure (no more buffer available)
  */
 int virtqueue_gather_available(virtqueue_device_t *vq, virtqueue_ring_object_t *robj,
-                               void **buf, unsigned *len, vq_flags_t *flag);
+                               void **buf, size_t *len, vq_flags_t *flag);
 
 /* Iteration function through a used buffer scatterlist. Returns the next buffer in the list.
  * @param vq the driver side virtqueue
@@ -193,4 +194,4 @@ int virtqueue_gather_available(virtqueue_device_t *vq, virtqueue_ring_object_t *
  * @return 1 on success, 0 on failure (no more buffer available)
  */
 int virtqueue_gather_used(virtqueue_driver_t *vq, virtqueue_ring_object_t *robj,
-                          void **buf, unsigned *len, vq_flags_t *flag);
+                          void **buf, size_t *len, vq_flags_t *flag);
