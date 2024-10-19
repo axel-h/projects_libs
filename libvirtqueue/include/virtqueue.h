@@ -59,9 +59,11 @@ typedef struct virtqueue_ring_object {
     size_t first;     /* The head of the scatter list in desc table */
 } virtqueue_ring_object_t;
 
+typedef void (*virtqueue_notify_fn_t)(void);
+
 /* A device-side virtqueue */
 typedef struct virtqueue_device {
-    void (*notify)(void);       /* Notify function to wake-up driver side */
+    virtqueue_notify_fn_t notify;  /* Notify function to wake-up driver side */
     void *cookie;               /* User-defined cookie */
 
     size_t queue_len;           /* The number of entries in rings and descriptor table */
@@ -74,7 +76,7 @@ typedef struct virtqueue_device {
 
 /* A driver-side virtqueue */
 typedef struct virtqueue_driver {
-    void (*notify)(void);       /* Notify function to wake-up device side */
+    virtqueue_notify_fn_t notify;  /* Notify function to wake-up device side */
     void *cookie;               /* User-defined cookie */
 
     size_t queue_len;           /* The number of entries in rings and descriptor table */

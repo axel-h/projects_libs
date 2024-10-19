@@ -8,8 +8,8 @@
 #include <virtqueue.h>
 
 void virtqueue_init_driver(virtqueue_driver_t *vq, size_t queue_len, vq_vring_avail_t *avail_ring,
-                           vq_vring_used_t *used_ring, vq_vring_desc_t *desc, void (*notify)(void),
-                           void *cookie)
+                           vq_vring_used_t *used_ring, vq_vring_desc_t *desc, 
+                           virtqueue_notify_fn_t notify, void *cookie)
 {
     if (!IS_POWER_OF_2(queue_len)) {
         ZF_LOGE("Invalid queue_len: %d, must be a power of 2.", queue_len);
@@ -29,8 +29,8 @@ void virtqueue_init_driver(virtqueue_driver_t *vq, size_t queue_len, vq_vring_av
 }
 
 void virtqueue_init_device(virtqueue_device_t *vq, size_t queue_len, vq_vring_avail_t *avail_ring,
-                           vq_vring_used_t *used_ring, vq_vring_desc_t *desc, void (*notify)(void),
-                           void *cookie)
+                           vq_vring_used_t *used_ring, vq_vring_desc_t *desc, 
+                           virtqueue_notify_fn_t notify, void *cookie)
 {
     if (!IS_POWER_OF_2(queue_len)) {
         ZF_LOGE("Invalid queue_len: %d, must be a power of 2.", queue_len);
